@@ -8,7 +8,7 @@ const scriptPath=fs.existsSync(path.join(__dirname,'../dist/script.js'))?'../dis
 let source = fs.readFileSync(path.join(__dirname,scriptPath),'utf8');
 const marker = "  if(new URLSearchParams(location.search).get('demo')==='1')startDemo();else renderLogin();";
 assert(source.includes(marker));
-source = source.replace(marker, `  globalThis.testAPI = {state,id,demoSeed,financials,filterTransactions,progress,update,insert,remove,saveDraft,eventLayout,calendarICS,csvCell,safeURL,esc}; return;`);
+source = source.replace(marker, `  globalThis.testAPI = {state,id,demoSeed,financials,filterTransactions,progress,update,insert,remove,saveDraft,eventLayout,calendarICS,csvCell,safeURL,esc,subtodos,todoDone,myTodos,todoParents}; return;`);
 const timers=[];
 const sandbox={
   window:{addEventListener(){}},document:{addEventListener(){},querySelector(){return null;},querySelectorAll(){return[];}},
@@ -77,9 +77,31 @@ const test=async(name,fn)=>{await fn();checks++;console.log('PASS '+name);};
   await test('Untrusted content and unsafe links cannot become HTML',()=>{
     assert.equal(api.esc('<img src=x onerror=alert(1)>'),'&lt;img src=x onerror=alert(1)&gt;');assert.equal(api.safeURL('javascript:alert(1)'),'');assert.equal(api.safeURL('https://meet.google.com/test'),'https://meet.google.com/test');
   });
+  await test('A task with steps is done only when every step is done',async()=>{
+    const p=api.todoParents().find(t=>api.subtodos(t.id).length);const subs=api.subtodos(p.id);
+    assert.equal(api.todoDone(p),false);
+    for(const s of subs)if(!s.done)await api.update('todos',s.id,{done:true},s.version);
+    assert.equal(api.todoDone(p),true);
+    const s0=api.subtodos(p.id)[0];await api.update('todos',s0.id,{done:false},s0.version);assert.equal(api.todoDone(p),false);
+  });
+  await test('Personal lists show own and shared steps, never the other founder\'s',()=>{
+    const [r,s]=api.state.members;const mine=api.myTodos(s.id).map(x=>x.item);
+    assert(mine.length>0);assert(mine.every(t=>!t.owner_id||t.owner_id===s.id));
+    assert(mine.some(t=>!t.owner_id));assert(api.myTodos(s.id,'solo').every(x=>x.item.owner_id===s.id));
+    assert(api.myTodos(r.id).every(x=>!x.item.owner_id||x.item.owner_id===r.id));
+    assert(mine.every(t=>!api.subtodos(t.id).length),'a task with steps is represented by its steps');
+  });
+  await test('Ticking from the personal list updates the shared record',async()=>{
+    const [,s]=api.state.members;const x=api.myTodos(s.id).find(x=>!x.item.done);await api.update('todos',x.item.id,{done:true},x.item.version);
+    assert.equal(api.state.todos.find(t=>t.id===x.item.id).done,true);
+  });
+  await test('Deleting a task removes its steps',async()=>{
+    const p=api.todoParents().find(t=>api.subtodos(t.id).length);await api.remove('todos',p.id);
+    assert.equal(api.state.todos.filter(t=>t.parent_id===p.id||t.id===p.id).length,0);
+  });
   await test('Deleting a project preserves transactions and detaches related records',async()=>{
     const p=api.state.projects[0],before=api.financials(api.state.transactions);await api.remove('projects',p.id);
-    assert.equal(api.state.tasks.filter(t=>t.project_id===p.id).length,0);assert(api.state.ideas.every(n=>n.project_id!==p.id));assert(api.state.transactions.every(t=>t.project_id!==p.id));assert.equal(api.financials(api.state.transactions).net,before.net);
+    assert.equal(api.state.tasks.filter(t=>t.project_id===p.id).length,0);assert(api.state.ideas.every(n=>n.project_id!==p.id));assert(api.state.transactions.every(t=>t.project_id!==p.id));assert(api.state.todos.every(t=>t.project_id!==p.id));assert.equal(api.financials(api.state.transactions).net,before.net);
   });
   console.log(`${checks} targeted checks passed. Live Supabase auth/RLS/Realtime requires a configured project.`);
 })().catch(err=>{console.error(err);process.exitCode=1;});

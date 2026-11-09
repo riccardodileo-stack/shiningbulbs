@@ -47,6 +47,23 @@ create table public.tasks (
   updated_at timestamptz not null default now(),
   unique(project_id,position)
 );
+create table public.todos (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references public.projects(id) on delete cascade,
+  parent_id uuid references public.todos(id) on delete cascade,
+  title text not null check (length(btrim(title)) between 1 and 200),
+  notes text not null default '' check (length(notes) <= 4000),
+  done boolean not null default false,
+  owner_id uuid references public.members(id) on delete set null, -- null = entrambi
+  due_date date,
+  position integer not null default 0,
+  created_by uuid not null references public.members(id),
+  updated_by uuid not null references public.members(id),
+  version bigint not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (parent_id is null or parent_id <> id)
+);
 create table public.ideas (
   id uuid primary key default gen_random_uuid(),
   title text not null check (length(btrim(title)) between 1 and 120),
@@ -92,6 +109,9 @@ create table public.transactions (
 );
 
 create index on public.tasks(project_id);
+create index on public.todos(project_id);
+create index on public.todos(parent_id);
+create index on public.todos(owner_id);
 create index on public.ideas(project_id);
 create index on public.events(start_at);
 create index on public.transactions(date);
@@ -128,7 +148,7 @@ using ((select public.is_member()));
 do $$
 declare t text;
 begin
-  foreach t in array array['projects','tasks','ideas','events','transactions'] loop
+  foreach t in array array['projects','tasks','todos','ideas','events','transactions'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon, authenticated', t);
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
@@ -176,7 +196,7 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
-  foreach t in array array['projects','tasks','ideas','events','transactions'] loop
+  foreach t in array array['projects','tasks','todos','ideas','events','transactions'] loop
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
       execute format('alter publication supabase_realtime add table public.%I',t);
     end if;

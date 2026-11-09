@@ -12,6 +12,8 @@ La modalità reale usa **Supabase Auth + PostgreSQL + Realtime**. Il progetto Su
 
 - **Progetti:** creazione, modifica ed eliminazione; responsabile Riccardo, Stefano o entrambi; piattaforma, descrizione, colore, icona e scadenza indicativa.
 - **Roadmap:** le tre fasi e tutte le 11 attività richieste, generate insieme al progetto. Ogni attività può essere completata o riaperta e avere responsabile e scadenza propri.
+- **Task:** task per progetto (o per lo studio in generale) con note, scadenza e un elenco di passi più piccoli. Ogni passo, o la task stessa se non ha passi, si assegna a Riccardo, a Stefano o a entrambi. Una task con passi risulta completata quando lo sono tutti i passi; spuntarla completa (o riapre) tutti i passi insieme.
+- **Le mie task:** la lista personale di chi ha fatto l’accesso, con i passi assegnati a sé e quelli condivisi, raggruppati per scadenza. Spuntare qui aggiorna lo stesso record della sezione Task, per entrambi. Una task condivisa (“Insieme”) si completa con una sola spunta.
 - **Calendario:** settimana con tutti gli orari e mese; incontri con agenda, progetto e link della call. Click su giorno/orario per creare, click su incontro per modificarlo. Gli incontri coinvolgono entrambi i founder. Gli orari vengono mostrati nel fuso del dispositivo. Esportazione `.ics` per Apple Calendar, Google Calendar o Outlook; non è una sincronizzazione bidirezionale con questi servizi.
 - **Idee:** fogli bianchi in blocchi, firma dell’autore, ultima firma di modifica, filtri per autore e progetto. Salvataggio dopo circa 650 ms di pausa nella scrittura. Le modifiche a blocchi diversi sono indipendenti. Se scrivete nello stesso blocco sulla stessa versione, la seconda scrittura non sovrascrive la prima: il testo locale resta disponibile e può essere salvato come nuova idea. Non è un editor con cursori condivisi o fusione di caratteri come Google Docs.
 - **Revenues:** ricavi per app e spese generali o per progetto; categorie, data, importo in EUR e chi ha pagato/incassato. Totali, risultato netto, margine, storico degli ultimi sei mesi, ripartizione costi e confronto tra anticipi dei founder. Filtri tutto/anno/mese, modifica/eliminazione e CSV.
@@ -33,9 +35,13 @@ insert into public.members (id, display_name) values
 ```
 
 5. Disabilita la registrazione pubblica degli utenti nelle impostazioni Auth. L’app offre solo l’accesso, senza registrazione. Anche un account Auth diverso dai due autorizzati resta escluso dai dati grazie alle policy del database.
-6. Controlla nelle impostazioni Realtime che `projects`, `tasks`, `ideas`, `events` e `transactions` siano nella pubblicazione `supabase_realtime`: lo script lo configura già.
+6. Controlla nelle impostazioni Realtime che `projects`, `tasks`, `todos`, `ideas`, `events` e `transactions` siano nella pubblicazione `supabase_realtime`: lo script lo configura già.
 
 La tabella `members` può contenere soltanto i due nomi, una volta ciascuno. Il browser può leggerla, ma non può aggiungere membri o modificare le autorizzazioni. Questa scelta è intenzionalmente limitata al vostro studio a due persone.
+
+### Aggiornare un database esistente
+
+Se avete già eseguito una versione precedente di `database.sql`, eseguite una volta `migrations/002_todos.sql` nel SQL Editor: crea la tabella `todos` con le stesse policy RLS e la aggiunge al Realtime. Finché non la eseguite, la sezione Task mostra un avviso e il resto dello studio funziona normalmente.
 
 ## 2. Collega il sito
 
