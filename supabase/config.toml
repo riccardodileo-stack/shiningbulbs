@@ -1,0 +1,3 @@
+# Il calendario dell'iPhone non può inviare un login: l'accesso è protetto dal token nel link.
+[functions.calendar]
+verify_jwt = false

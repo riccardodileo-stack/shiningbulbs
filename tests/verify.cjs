@@ -99,9 +99,19 @@ const test=async(name,fn)=>{await fn();checks++;console.log('PASS '+name);};
     const p=api.todoParents().find(t=>api.subtodos(t.id).length);await api.remove('todos',p.id);
     assert.equal(api.state.todos.filter(t=>t.parent_id===p.id||t.id===p.id).length,0);
   });
+  await test('Activity records who completed a step, and steps written with a new task stay quiet',async()=>{
+    const [r]=api.state.members;const before=api.state.activity.length;
+    const x=api.state.todos.find(t=>!t.done&&!api.state.todos.some(c=>c.parent_id===t.id));await api.update('todos',x.id,{done:true},x.version);
+    assert.equal(api.state.activity[0].verb,'ha completato');assert.equal(api.state.activity[0].title,x.title);assert.equal(api.state.activity[0].actor_id,api.state.user.id);
+    const y=api.state.todos.find(t=>t.id===x.id);await api.update('todos',y.id,{due_date:'2030-01-01'},y.version);
+    assert.equal(api.state.activity.length,before+1,'date changes are not logged');
+    const parent=await api.insert('todos',{title:'Nuova',parent_id:null,project_id:null,owner_id:null,done:false,position:0});
+    await api.insert('todos',{title:'Passo',parent_id:parent.id,project_id:null,owner_id:null,done:false,position:0});
+    assert.equal(api.state.activity[0].verb,'ha creato la task');
+  });
   await test('Deleting a project preserves transactions and detaches related records',async()=>{
     const p=api.state.projects[0],before=api.financials(api.state.transactions);await api.remove('projects',p.id);
-    assert.equal(api.state.tasks.filter(t=>t.project_id===p.id).length,0);assert(api.state.ideas.every(n=>n.project_id!==p.id));assert(api.state.transactions.every(t=>t.project_id!==p.id));assert(api.state.todos.every(t=>t.project_id!==p.id));assert.equal(api.financials(api.state.transactions).net,before.net);
+    assert.equal(api.state.tasks.filter(t=>t.project_id===p.id).length,0);assert(api.state.ideas.every(n=>n.project_id!==p.id));assert(api.state.transactions.every(t=>t.project_id!==p.id));assert(api.state.todos.every(t=>t.project_id!==p.id));assert(api.state.resources.every(x=>x.project_id!==p.id));assert.equal(api.financials(api.state.transactions).net,before.net);
   });
   console.log(`${checks} targeted checks passed. Live Supabase auth/RLS/Realtime requires a configured project.`);
 })().catch(err=>{console.error(err);process.exitCode=1;});

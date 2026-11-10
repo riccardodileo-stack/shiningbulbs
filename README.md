@@ -6,7 +6,7 @@ Un gestionale per Riccardo e Stefano, pensato prima di tutto per Mac e PC. Inter
 
 **L’anteprima è una dimostrazione, non un database condiviso già attivo.** Il pulsante “Esplora l’anteprima” apre esempi modificabili conservati solo in memoria. Ricaricando la pagina, tornano i dati di esempio. Non contiene account reali, non salva dati e non comunica tra computer.
 
-La modalità reale usa **Supabase Auth + PostgreSQL + Realtime**. Il progetto Supabase deve essere creato dal proprietario e collegato come spiegato sotto. Non è necessario condividere password o chiavi segrete con ChatGPT. Il codice non usa localStorage, sessionStorage o IndexedDB. Anche la sessione di login resta solo in memoria: dopo una ricarica è necessario accedere di nuovo.
+La modalità reale usa **Supabase Auth + PostgreSQL + Realtime**. Il progetto Supabase deve essere creato dal proprietario e collegato come spiegato sotto. Non è necessario condividere password o chiavi segrete con ChatGPT. L’unico dato salvato nel browser è la sessione di accesso, e solo se al login lasciate attivo “Resta collegato su questo dispositivo”: in quel caso riaprendo la pagina si entra direttamente, finché non uscite. Senza la spunta la sessione resta in memoria e dopo una ricarica bisogna accedere di nuovo. Su un computer condiviso togliete la spunta.
 
 ## Cosa comprende
 
@@ -14,9 +14,12 @@ La modalità reale usa **Supabase Auth + PostgreSQL + Realtime**. Il progetto Su
 - **Roadmap:** le tre fasi e tutte le 11 attività richieste, generate insieme al progetto. Ogni attività può essere completata o riaperta e avere responsabile e scadenza propri.
 - **Task:** task per progetto (o per lo studio in generale) con note, scadenza e un elenco di passi più piccoli. Ogni passo, o la task stessa se non ha passi, si assegna a Riccardo, a Stefano o a entrambi. Una task con passi risulta completata quando lo sono tutti i passi; spuntarla completa (o riapre) tutti i passi insieme.
 - **Le mie task:** la lista personale di chi ha fatto l’accesso, con i passi assegnati a sé e quelli condivisi, raggruppati per scadenza. Spuntare qui aggiorna lo stesso record della sezione Task, per entrambi. Una task condivisa (“Insieme”) si completa con una sola spunta.
-- **Calendario:** settimana con tutti gli orari e mese; incontri con agenda, progetto e link della call. Click su giorno/orario per creare, click su incontro per modificarlo. Gli incontri coinvolgono entrambi i founder. Gli orari vengono mostrati nel fuso del dispositivo. Esportazione `.ics` per Apple Calendar, Google Calendar o Outlook; non è una sincronizzazione bidirezionale con questi servizi.
+- **Calendario:** settimana con tutti gli orari e mese; incontri con agenda, progetto e link della call. Click su giorno/orario per creare, click su incontro per modificarlo. Gli incontri coinvolgono entrambi i founder. Gli orari vengono mostrati nel fuso del dispositivo. Esportazione `.ics` una tantum e **calendario in abbonamento** (pulsante “Su iPhone”): ogni founder ha un link personale che Calendario di iPhone/Mac, Google Calendar o Outlook ricaricano periodicamente. È in sola lettura: gli incontri si creano e si modificano nel gestionale.
 - **Idee:** fogli bianchi in blocchi, firma dell’autore, ultima firma di modifica, filtri per autore e progetto. Salvataggio dopo circa 650 ms di pausa nella scrittura. Le modifiche a blocchi diversi sono indipendenti. Se scrivete nello stesso blocco sulla stessa versione, la seconda scrittura non sovrascrive la prima: il testo locale resta disponibile e può essere salvato come nuova idea. Non è un editor con cursori condivisi o fusione di caratteri come Google Docs.
 - **Revenues:** ricavi per app e spese generali o per progetto; categorie, data, importo in EUR e chi ha pagato/incassato. Totali, risultato netto, margine, storico degli ultimi sei mesi, ripartizione costi e confronto tra anticipi dei founder. Filtri tutto/anno/mese, modifica/eliminazione e CSV.
+- **Risorse:** nella pagina di ogni progetto, i link utili (repository, Figma, store, documenti, cartelle). Solo link: le password restano nel vostro password manager.
+- **Ultime attività:** nella home, cosa ha fatto l’altro (task completate o assegnate, incontri, idee, movimenti, link). La cronologia è scritta dal database, non può essere modificata dal browser e conserva gli ultimi 120 giorni.
+- **Da telefono:** sotto i 720 px di larghezza il menu diventa una barra in basso (Progetti, Task, Le mie, Calendario, Altro), il calendario si apre nella vista Elenco e le finestre salgono dal basso. Su iPhone: Safari → Condividi → “Aggiungi alla schermata Home” per usarlo a schermo intero come un’app.
 - **Studio:** ricerca, scorciatoie, profili, esportazione JSON dei dati. L’esportazione è un’istantanea; non è incluso un import automatico.
 
 Il calendario non genera automaticamente link Meet/Teams né notifiche; permette di annotare i link già disponibili. Revenues registra importi effettivi inseriti manualmente: non legge App Store Connect, non importa transazioni bancarie e non calcola imposte. Un abbonamento si registra a ogni addebito; non genera spese future in automatico.
@@ -42,6 +45,20 @@ La tabella `members` può contenere soltanto i due nomi, una volta ciascuno. Il 
 ### Aggiornare un database esistente
 
 Se avete già eseguito una versione precedente di `database.sql`, eseguite una volta `migrations/002_todos.sql` nel SQL Editor: crea la tabella `todos` con le stesse policy RLS e la aggiunge al Realtime. Finché non la eseguite, la sezione Task mostra un avviso e il resto dello studio funziona normalmente.
+
+### Risorse e cronologia
+
+Eseguite `migrations/004_resources_activity.sql` nel SQL Editor (dopo `database.sql` o `002_todos.sql`). Si può rieseguire. Finché non lo fate, il gestionale funziona e la sezione Risorse mostra un avviso.
+
+### Calendario sull’iPhone (facoltativo, gratuito)
+
+1. Eseguite `migrations/003_calendar_feed.sql` nel SQL Editor (si può rieseguire: serve anche per aggiornarlo, i link già creati restano validi). Nel calendario compaiono gli incontri e le vostre task aperte con scadenza, come eventi di un giorno intero.
+2. Pubblicate la Edge Function `supabase/functions/calendar/index.ts` **con “Verify JWT” disattivato** (l’iPhone non può fare login: la protezione è il token nel link). Due modi:
+   - **Dashboard:** Edge Functions → Deploy a new function → Via Editor, nome `calendar`, incollate il contenuto di `index.ts`, poi nelle impostazioni della funzione disattivate “Enforce JWT verification”.
+   - **CLI** (dalla cartella del repository): `npx supabase login` e poi `npx supabase functions deploy calendar --no-verify-jwt --project-ref ID_DEL_PROGETTO`.
+3. Nel gestionale: Calendario → **Su iPhone**. Aprendo la finestra dall’iPhone, il pulsante “Iscriviti” aggiunge il calendario; in alternativa copiate il link in Impostazioni → Calendario → Account → Aggiungi account → Altro → Aggiungi calendario in abbonamento.
+
+Il link è personale e va trattato come una password: chi lo possiede vede gli incontri (ultimi 6 mesi e futuri), non può modificarli. “Genera un nuovo link” revoca subito quello vecchio. La frequenza di aggiornamento la decide il calendario del telefono: le modifiche non arrivano all’istante. Rientra ampiamente nella quota gratuita delle Edge Functions.
 
 ## 2. Collega il sito
 
