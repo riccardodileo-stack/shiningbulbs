@@ -8,7 +8,7 @@ const scriptPath=fs.existsSync(path.join(__dirname,'../dist/script.js'))?'../dis
 let source = fs.readFileSync(path.join(__dirname,scriptPath),'utf8');
 const marker = "  if(new URLSearchParams(location.search).get('demo')==='1')startDemo();else renderLogin();";
 assert(source.includes(marker));
-source = source.replace(marker, `  globalThis.testAPI = {state,id,demoSeed,financials,filterTransactions,progress,update,insert,remove,saveDraft,eventLayout,calendarICS,csvCell,safeURL,esc,subtodos,todoDone,myTodos,todoParents}; return;`);
+source = source.replace(marker, `  globalThis.testAPI = {state,id,demoSeed,financials,filterTransactions,progress,update,insert,remove,saveDraft,eventLayout,calendarICS,csvCell,safeURL,esc,merge3,subtodos,todoDone,myTodos,todoParents}; return;`);
 const timers=[];
 const sandbox={
   window:{addEventListener(){}},document:{addEventListener(){},querySelector(){return null;},querySelectorAll(){return[];}},
@@ -16,6 +16,7 @@ const sandbox={
   Date,Intl,URL,URLSearchParams,TextEncoder,console,
   setTimeout(fn){timers.push(fn);return timers.length;},clearTimeout(){},
 };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../vendor/diff_match_patch.js'),'utf8'),sandbox,{filename:'diff_match_patch.js'});
 vm.runInNewContext(source,sandbox,{filename:'script.js'});
 const api=sandbox.testAPI;
 let checks=0;
@@ -59,6 +60,29 @@ const test=async(name,fn)=>{await fn();checks++;console.log('PASS '+name);};
     const pending=api.saveDraft(n.id);d.content='Most recent text';await pending;
     assert.equal(d.dirty,true);assert.equal(timers.length,1);await timers.shift()();
     assert.equal(api.state.ideas.find(i=>i.id===n.id).content,'Most recent text');assert.equal(api.state.drafts.has(n.id),false);
+  });
+  await test('Edits to different parts of an idea merge; edits to the same words do not',()=>{
+    const base='Prima riga.\nSeconda riga.\nTerza riga.';
+    const m=api.merge3(base,base.replace('Prima','La prima'),base.replace('Terza','Ultima'));
+    assert.equal(m.ok,true);assert.equal(m.text,'La prima riga.\nSeconda riga.\nUltima riga.');
+    assert.equal(api.merge3(base,base.replace('Seconda riga','Riga due'),base.replace('Seconda riga','Riga numero due')).ok,false);
+    assert.equal(api.merge3(base,base,base+' x').text,base+' x');assert.equal(api.merge3(undefined,'a','b').ok,false);
+  });
+  await test('Two people writing in the same idea: the second save merges instead of blocking',async()=>{
+    timers.length=0;const [r,s]=api.state.members;const n=api.state.ideas[2];const base=n.content;
+    const d={content:base+'\nUna nuova riga mia.',baseContent:base,baseVersion:n.version,dirty:true,saving:false,conflict:false,snapshot:{...n}};api.state.drafts.set(n.id,d);
+    await api.update('ideas',n.id,{content:'Titolo di Stefano.\n'+base,updated_by:s.id},n.version);
+    await api.saveDraft(n.id);while(timers.length)await timers.shift()();
+    const saved=api.state.ideas.find(i=>i.id===n.id).content;
+    assert.equal(saved,'Titolo di Stefano.\n'+base+'\nUna nuova riga mia.');assert.equal(api.state.drafts.has(n.id),false);
+  });
+  await test('Same words changed by both: nothing is lost and both versions are kept for the choice',async()=>{
+    timers.length=0;const [,s]=api.state.members;const n=api.state.ideas[2];const base=n.content;
+    const d={content:base.replace('Titolo di Stefano','Titolo mio'),baseContent:base,baseVersion:n.version,dirty:true,saving:false,conflict:false,snapshot:{...n}};api.state.drafts.set(n.id,d);
+    await api.update('ideas',n.id,{content:base.replace('Titolo di Stefano','Titolo suo'),updated_by:s.id},n.version);
+    await api.saveDraft(n.id);while(timers.length)await timers.shift()();
+    assert.equal(d.conflict,true);assert(d.content.includes('Titolo mio'));assert(d.theirs.includes('Titolo suo'));assert(api.state.ideas.find(i=>i.id===n.id).content.includes('Titolo suo'));
+    api.state.drafts.delete(n.id);
   });
   await test('Overlapping meetings get separate lanes; touching meetings can reuse a lane',()=>{
     const e=(start,end,id)=>({id,start_at:`2026-10-23T${start}:00Z`,end_at:`2026-10-23T${end}:00Z`});

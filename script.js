@@ -63,7 +63,7 @@
   const TABLES=['projects','tasks','todos','ideas','events','transactions','resources'];
   const COLORS={blue:'#89a5e6',purple:'#b09ad6',green:'#8ab9a2',amber:'#d8b67f'};
   const CATEGORIES={revenue:'Ricavi app',ai:'Software e AI',developer:'Account sviluppatori',hosting:'Hosting e servizi',marketing:'Marketing',other:'Altro'};
-  const state={user:null,demo:false,view:'projects',projectId:null,filter:'all',ideaFilter:'all',period:'all',calView:'week',calDate:today(),members:[],projects:[],tasks:[],ideas:[],events:[],transactions:[],todos:[],resources:[],activity:[],missing:{},remember:false,todoProject:'all',todoStatus:'open',myStatus:'open',myScope:'all',todosMissing:false,connected:false,loading:false,client:null,channel:null,drafts:new Map(),noteTimers:new Map(),loadSeq:0};
+  const state={user:null,demo:false,view:'projects',projectId:null,filter:'all',ideaFilter:'all',period:'all',calView:'week',calDate:today(),members:[],projects:[],tasks:[],ideas:[],events:[],transactions:[],todos:[],resources:[],activity:[],typing:new Map(),missing:{},remember:false,todoProject:'all',todoStatus:'open',myStatus:'open',myScope:'all',todosMissing:false,connected:false,loading:false,client:null,channel:null,drafts:new Map(),noteTimers:new Map(),loadSeq:0};
   const isPhone=()=>!!window.matchMedia?.('(max-width:720px)').matches;
   if(isPhone())state.calView='list';
   const member = uid => state.members.find(m=>m.id===uid);
@@ -86,7 +86,7 @@
   const myTodos = (uid,scope='all') => todoParents().flatMap(p=>{const s=subtodos(p.id);return (s.length?s:[p]).filter(t=>scope==='solo'?t.owner_id===uid:assignedTo(t,uid)).map(t=>({item:t,parent:p}));});
   const openMine = () => state.user?myTodos(state.user.id).filter(x=>!x.item.done).length:0;
   const byDue = (a,b) => (a.due_date||'9999').localeCompare(b.due_date||'9999');
-  function notify(message,error=false){const d=document.createElement('div');d.className=`toast${error?' error':''}`;d.innerHTML=icon(error?'info':'checkCircle',16)+`<span>${esc(message)}</span>`;$('#toasts').append(d);setTimeout(()=>d.remove(),5200);}
+  function notify(message,error=false){if(!$('#toasts'))return;const d=document.createElement('div');d.className=`toast${error?' error':''}`;d.innerHTML=icon(error?'info':'checkCircle',16)+`<span>${esc(message)}</span>`;const box=$('#toasts');if(!box)return;box.append(d);setTimeout(()=>d.remove(),5200);}
   function demoSeed(){
     const r=id(),s=id(),p1=id(),p2=id(),p3=id();
     state.members=[{id:r,display_name:'Riccardo'},{id:s,display_name:'Stefano'}];
@@ -202,6 +202,7 @@
   function subscribe(){
     let ch=state.client.channel('shiningbulbs-database');
     TABLES.filter(t=>!state.missing[t]).forEach(table=>{ch=ch.on('postgres_changes',{event:'*',schema:'public',table},()=>{clearTimeout(refreshTimer);refreshTimer=setTimeout(async()=>{try{await loadRemote();if(state.user)renderContent(true);}catch(e){state.connected=false;updateSync();notify(e.message,true);}},160);});});
+    ch=ch.on('broadcast',{event:'typing'},msg=>receiveTyping(msg?.payload));
     state.channel=ch.subscribe(async status=>{state.connected=status==='SUBSCRIBED';updateSync();if(status==='SUBSCRIBED'){try{await loadRemote();if(state.user)renderContent(true);}catch(e){notify(e.message,true);}}});
   }
   function updateSync(){const el=$('#sync-status');if(el)el.outerHTML=syncMarkup();}
@@ -242,7 +243,7 @@
   function renderContent(preserve=false){
     if(!state.user)return;
     const main=$('#main-content');if(!main)return;
-    const active=document.activeElement,key=active?.dataset?.focusKey,start=active?.selectionStart,end=active?.selectionEnd,typed=active?.tagName==='INPUT'&&active.type==='text'?active.value:undefined;
+    const active=document.activeElement,key=active?.dataset?.focusKey,start=active?.selectionStart,end=active?.selectionEnd,typed=active?.tagName==='INPUT'&&active.type==='text'?active.value:undefined,noteOld=active?.dataset?.noteId?active.value:undefined;
     const scrollY=window.scrollY,scrollBox=$('.calendar-scroll'),scrollTop=scrollBox?.scrollTop;
     const titles={projects:'Progetti',todos:'Task',mytodos:'Le mie task',calendar:'Calendario',ideas:'Idee',revenues:'Revenues',settings:'Impostazioni'};
     $('#breadcrumb-view').textContent=state.projectId&&state.view==='projects'?project(state.projectId)?.name||'Progetti':titles[state.view];
@@ -250,7 +251,7 @@
     $('#project-count').textContent=state.projects.length;if($('#my-todo-count'))$('#my-todo-count').textContent=openMine();const tb=$('#tab-todo-count');if(tb){const n=openMine();tb.textContent=n>9?'9+':n;tb.hidden=!n;}$$('.tabbar [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));$('.tabbar .more-tab')?.classList.toggle('active',['ideas','revenues','settings'].includes(state.view));
     const views={projects:()=>state.projectId?renderProject():renderProjects(),todos:renderTodos,mytodos:renderMyTodos,calendar:renderCalendar,ideas:renderIdeas,revenues:renderRevenues,settings:renderSettings};
     main.innerHTML=views[state.view]()+`<footer class="page-footer"><span>ShiningBulbs Studio &nbsp;·&nbsp; Built together.</span><span>Un’idea alla volta. Una release alla volta.</span></footer>`;
-    if(preserve&&key){const el=$$('[data-focus-key]',main).find(e=>e.dataset.focusKey===key);if(el){if(typed!==undefined&&el.tagName==='INPUT'&&el.type==='text')el.value=typed;el.focus({preventScroll:true});if(typeof start==='number'&&typeof el.setSelectionRange==='function'){try{el.setSelectionRange(start,end);}catch{}}}}
+    if(preserve&&key){const el=$$('[data-focus-key]',main).find(e=>e.dataset.focusKey===key);if(el){if(typed!==undefined&&el.tagName==='INPUT'&&el.type==='text')el.value=typed;el.focus({preventScroll:true});if(typeof start==='number'&&typeof el.setSelectionRange==='function'){let s0=start,e0=end;if(noteOld!==undefined&&el.value!==noteOld){s0=mapCursor(noteOld,el.value,start);e0=mapCursor(noteOld,el.value,end);}try{el.setSelectionRange(s0,e0);}catch{}}}}
     if(preserve){window.scrollTo(0,scrollY);if(scrollTop!==undefined&&$('.calendar-scroll'))$('.calendar-scroll').scrollTop=scrollTop;}
     if(state.view==='calendar'&&state.calView==='week'&&!preserve&&$('.calendar-scroll'))$('.calendar-scroll').scrollTop=7*60;
   }
@@ -274,6 +275,18 @@
     const flush=()=>{group.forEach(x=>result.push({...x,lanes:ends.length}));group=[];ends=[];maxEnd=0;};
     for(const ev of list){const st=+new Date(ev.start_at),en=+new Date(ev.end_at);if(group.length&&st>=maxEnd)flush();let lane=ends.findIndex(e=>e<=st);if(lane<0)lane=ends.length;ends[lane]=en;maxEnd=Math.max(maxEnd,en);group.push({ev,lane});}if(group.length)flush();return result;
   }
+  // Tema: automatico (segue il sistema), chiaro o scuro. La scelta resta su questo dispositivo.
+  const THEME_KEY='shiningbulbs-theme';
+  const themePref=()=>{try{return localStorage.getItem(THEME_KEY)||'auto';}catch{return 'auto';}};
+  const systemDark=()=>!!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  function applyTheme(){
+    if(typeof document==='undefined'||!document.documentElement?.setAttribute)return;
+    const pref=themePref(),dark=pref==='dark'||(pref==='auto'&&systemDark());
+    document.documentElement.setAttribute('data-theme',dark?'dark':'light');
+    const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=dark?'#0e1014':'#f5f6f8';
+  }
+  function setTheme(pref){try{if(pref==='auto')localStorage.removeItem(THEME_KEY);else localStorage.setItem(THEME_KEY,pref);}catch{}applyTheme();}
+  const themeSwitch=()=>`<div class="segmented theme-switch" aria-label="Tema">${[['auto','Automatico'],['light','Chiaro'],['dark','Scuro']].map(([k,l])=>`<button data-action="set-theme" data-theme-value="${k}" class="${themePref()===k?'active':''}">${l}</button>`).join('')}</div>`;
   function calendarList(){
     const startKey=dateKey(state.calDate),endKey=dateKey(shiftDay(state.calDate,60)),todayKey=dateKey(today());
     const evs=state.events.filter(e=>{const k=dateKey(new Date(e.start_at));return k>=startKey&&k<=endKey;}).sort((a,b)=>a.start_at.localeCompare(b.start_at));
@@ -284,7 +297,7 @@
   function moreSheet(){
     const d=$('#modal');if(d.open)d.close();d.className='sheet';
     const item=(action,view,ic,label)=>`<button class="sheet-item ${state.view===view?'active':''}" data-action="${action}" ${view?`data-view="${view}"`:''}>${icon(ic,18)}<span>${label}</span>${icon('chevron',13)}</button>`;
-    d.innerHTML=`<div class="modal-header"><div class="row">${avatar(state.user.id)}<div><h2 id="modal-title" style="font-size:16px">${esc(memberName(state.user.id))}</h2><small class="muted" style="font-size:10px">${state.demo?'Profilo di esempio':'Founder · ShiningBulbs'}</small></div></div><button type="button" class="icon-btn" data-action="close-modal" aria-label="Chiudi">${icon('close',17)}</button></div><div class="modal-body sheet-list">${item('nav','ideas','ideas','Idee')}${item('nav','revenues','revenues','Revenues')}${item('search','','search','Cerca nello studio')}${item('nav','settings','settings','Impostazioni')}${item('logout','','logout','Esci dallo studio')}</div>`;d.showModal();
+    d.innerHTML=`<div class="modal-header"><div class="row">${avatar(state.user.id)}<div><h2 id="modal-title" style="font-size:16px">${esc(memberName(state.user.id))}</h2><small class="muted" style="font-size:10px">${state.demo?'Profilo di esempio':'Founder · ShiningBulbs'}</small></div></div><button type="button" class="icon-btn" data-action="close-modal" aria-label="Chiudi">${icon('close',17)}</button></div><div class="modal-body sheet-list">${item('nav','ideas','ideas','Idee')}${item('nav','revenues','revenues','Revenues')}${item('search','','search','Cerca nello studio')}<div class="sheet-theme"><span>Aspetto</span>${themeSwitch()}</div>${item('nav','settings','settings','Impostazioni')}${item('logout','','logout','Esci dallo studio')}</div>`;d.showModal();
   }
   function renderCalendar(){
     const start=startOfWeek(state.calDate),days=Array.from({length:7},(_,i)=>shiftDay(start,i));
@@ -303,13 +316,78 @@
   function renderIdeas(){
     const orphaned=[...state.drafts.entries()].filter(([uid,d])=>!state.ideas.some(n=>n.id===uid)&&d.snapshot).map(([,d])=>{d.conflict=true;return d.snapshot;});
     const list=[...state.ideas,...orphaned].filter(n=>state.ideaFilter==='all'||state.ideaFilter===n.created_by||state.ideaFilter===n.project_id).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
-    return heading('Idee','Lo spazio bianco prima della prossima grande cosa.',newButton('idea','Nuova idea'))+`<div class="ideas-toolbar"><button class="filter-chip ${state.ideaFilter==='all'?'active':''}" data-action="idea-filter" data-filter="all">Tutte le idee</button>${state.members.map(m=>`<button class="filter-chip ${state.ideaFilter===m.id?'active':''}" data-action="idea-filter" data-filter="${m.id}">${esc(m.display_name)}</button>`).join('')}${state.projects.map(p=>`<button class="filter-chip ${state.ideaFilter===p.id?'active':''}" data-action="idea-filter" data-filter="${p.id}">${esc(p.name)}</button>`).join('')}</div><div class="ideas-grid">${list.map(n=>{const draft=state.drafts.get(n.id),content=draft?draft.content:n.content;return `<article class="card note ${n.color||'blue'}"><div class="row between"><span class="tag ${n.color||'blue'}">${n.project_id?esc(project(n.project_id)?.name||'Studio'):'Pensieri sparsi'}</span><button class="icon-btn" data-action="edit-idea" data-id="${n.id}" title="Modifica titolo e dettagli" aria-label="Modifica ${esc(n.title)}">${icon('more',16)}</button></div><h3>${esc(n.title)}</h3><textarea data-note-id="${n.id}" data-focus-key="note-${n.id}" aria-label="Testo: ${esc(n.title)}" placeholder="Inizia da un’intuizione…" maxlength="20000">${esc(content)}</textarea>${draft?.conflict?`<div class="note-conflict">L’idea è cambiata durante la scrittura. Il tuo testo è qui al sicuro.<br><button class="btn small" style="margin-top:6px" data-action="copy-draft" data-id="${n.id}">Salva il mio testo come nuova idea</button></div>`:draft?.failed?`<div class="note-conflict">Connessione non disponibile. Il testo è ancora qui.<br><button class="btn small" data-action="retry-note" data-id="${n.id}" style="margin-top:6px">Riprova il salvataggio</button></div>`:''}<div class="note-foot">${avatar(n.created_by)}<span>Idea di ${esc(memberName(n.created_by))}</span>${n.updated_by&&n.updated_by!==n.created_by?`<span title="Ultima modifica di ${esc(memberName(n.updated_by))}">· modificata da ${esc(memberName(n.updated_by))}</span>`:''}<span class="save-status" data-save-status="${n.id}">${draft?.conflict?'Da risolvere':draft?.saving?'Salvataggio…':draft?.dirty?'Da salvare':state.demo?'Temporanea':'Salvata'}</span></div></article>`;}).join('')}<button class="project-add note-add" data-action="new-idea"><span class="add-circle">${icon('plus',17)}</span>C’è spazio per un’altra idea</button></div><div class="ideas-caption">${icon('info',13)}Ogni idea ha una firma. Il testo si salva mentre scrivete; le modifiche allo stesso blocco sono controllate.</div>`;
+    return heading('Idee','Lo spazio bianco prima della prossima grande cosa.',newButton('idea','Nuova idea'))+`<div class="ideas-toolbar"><button class="filter-chip ${state.ideaFilter==='all'?'active':''}" data-action="idea-filter" data-filter="all">Tutte le idee</button>${state.members.map(m=>`<button class="filter-chip ${state.ideaFilter===m.id?'active':''}" data-action="idea-filter" data-filter="${m.id}">${esc(m.display_name)}</button>`).join('')}${state.projects.map(p=>`<button class="filter-chip ${state.ideaFilter===p.id?'active':''}" data-action="idea-filter" data-filter="${p.id}">${esc(p.name)}</button>`).join('')}</div><div class="ideas-grid">${list.map(n=>{const draft=state.drafts.get(n.id),content=draft?draft.content:n.content;return `<article class="card note ${n.color||'blue'}"><div class="row between"><span class="tag ${n.color||'blue'}">${n.project_id?esc(project(n.project_id)?.name||'Studio'):'Pensieri sparsi'}</span><button class="icon-btn" data-action="edit-idea" data-id="${n.id}" title="Modifica titolo e dettagli" aria-label="Modifica ${esc(n.title)}">${icon('more',16)}</button></div><h3>${esc(n.title)}</h3><span class="typing-indicator ${state.typing.has(n.id)?'active':''}" data-typing-for="${n.id}" aria-live="polite">${esc(typingLabel(n.id))}</span><textarea data-note-id="${n.id}" data-focus-key="note-${n.id}" aria-label="Testo: ${esc(n.title)}" placeholder="Inizia da un’intuizione…" maxlength="20000">${esc(content)}</textarea>${draft?.conflict?`<div class="note-conflict"><strong>${draft.theirsBy&&draft.theirsBy!==state.user.id?esc(memberName(draft.theirsBy))+' ha modificato le stesse parole mentre scrivevi.':'L’idea è cambiata durante la scrittura.'}</strong> Nessun testo è andato perso: qui sopra c’è il tuo.${typeof draft.theirs==='string'?`<details><summary>Vedi l’altra versione</summary><pre>${esc(draft.theirs)}</pre></details>`:''}<div class="note-conflict-actions"><button class="btn small primary" data-action="keep-mine" data-id="${n.id}">Tieni il mio</button>${typeof draft.theirs==='string'?`<button class="btn small" data-action="keep-theirs" data-id="${n.id}">Tieni l’altra</button>`:''}<button class="btn small" data-action="copy-draft" data-id="${n.id}">Salva il mio come nuova idea</button></div></div>`:draft?.failed?`<div class="note-conflict">Connessione non disponibile. Il testo è ancora qui.<br><button class="btn small" data-action="retry-note" data-id="${n.id}" style="margin-top:6px">Riprova il salvataggio</button></div>`:''}<div class="note-foot">${avatar(n.created_by)}<span>Idea di ${esc(memberName(n.created_by))}</span>${n.updated_by&&n.updated_by!==n.created_by?`<span title="Ultima modifica di ${esc(memberName(n.updated_by))}">· modificata da ${esc(memberName(n.updated_by))}</span>`:''}<span class="save-status" data-save-status="${n.id}">${draft?.conflict?'Da risolvere':draft?.saving?'Salvataggio…':draft?.dirty?'Da salvare':state.demo?'Temporanea':'Salvata'}</span></div></article>`;}).join('')}<button class="project-add note-add" data-action="new-idea"><span class="add-circle">${icon('plus',17)}</span>C’è spazio per un’altra idea</button></div><div class="ideas-caption">${icon('info',13)}Ogni idea ha una firma. Il testo si salva mentre scrivete; se scrivete insieme nella stessa idea, le modifiche vengono unite da sole.</div>`;
   }
   function setNoteStatus(uid,text){const el=$$('[data-save-status]').find(x=>x.dataset.saveStatus===uid);if(el)el.textContent=text;}
+  // ===== Idee: unione automatica delle modifiche (3 vie) e indicatore "sta scrivendo"
+  let dmpInstance=null;
+  const dmp=()=>{if(!dmpInstance&&window.diff_match_patch){dmpInstance=new window.diff_match_patch();dmpInstance.Diff_Timeout=0.5;}return dmpInstance;};
+  // Intervalli del testo base toccati da una modifica (dopo una pulizia "a parole").
+  function changedRanges(d,base,other){
+    const diffs=d.diff_main(base,other);d.diff_cleanupSemantic(diffs);
+    const out=[];let i=0,cur=null;
+    for(const [op,text] of diffs){if(op===0){if(cur){out.push(cur);cur=null;}i+=text.length;}else{if(!cur)cur={s:i,e:i};if(op===-1){i+=text.length;cur.e=i;}}}
+    if(cur)out.push(cur);return out;
+  }
+  // Unisce le mie modifiche e le sue partendo dalla stessa base; rifiuta se toccano le stesse parole.
+  function merge3(base,mine,theirs){
+    if(mine===theirs||theirs===base)return {ok:true,text:mine};
+    if(typeof base!=='string')return {ok:false};
+    if(mine===base)return {ok:true,text:theirs};
+    const d=dmp();if(!d)return {ok:false};
+    const a=changedRanges(d,base,mine),b=changedRanges(d,base,theirs);
+    const clash=a.some(x=>b.some(y=>(x.s<y.e&&y.s<x.e)||x.s===y.s||(x.s===x.e&&x.s>y.s&&x.s<y.e)||(y.s===y.e&&y.s>x.s&&y.s<x.e)));
+    if(clash)return {ok:false};
+    const [text,results]=d.patch_apply(d.patch_make(base,mine),theirs);
+    return results.every(Boolean)?{ok:true,text}:{ok:false};
+  }
+  const mapCursor=(oldText,newText,pos)=>{const d=dmp();if(!d||typeof pos!=='number')return Math.min(pos||0,newText.length);return d.diff_xIndex(d.diff_main(oldText,newText),pos);};
+  function setNoteText(uid,text){
+    const el=$$('[data-note-id]').find(x=>x.dataset.noteId===uid);if(!el||el.value===text)return;
+    const focused=document.activeElement===el,old=el.value,s=el.selectionStart,e=el.selectionEnd;el.value=text;
+    if(focused){try{el.setSelectionRange(mapCursor(old,text,s),mapCursor(old,text,e));}catch{}}
+  }
+  async function fetchLatestIdea(uid){
+    if(state.demo)return state.ideas.find(i=>i.id===uid)||null;
+    const {data,error}=await state.client.from('ideas').select('*').eq('id',uid).maybeSingle();if(error)throw error;
+    if(data){const i=state.ideas.findIndex(x=>x.id===uid);if(i>=0)state.ideas[i]=data;else state.ideas.push(data);}
+    return data;
+  }
+  async function tryMerge(uid,d){
+    try{
+      const latest=await fetchLatestIdea(uid);if(!latest||state.drafts.get(uid)!==d)return false;
+      const r=merge3(d.baseContent,d.content,latest.content);
+      d.theirs=latest.content;d.theirsVersion=latest.version;d.theirsBy=latest.updated_by;
+      if(!r.ok||(d.merges||0)>=5)return false;
+      d.content=r.text;d.baseContent=latest.content;d.baseVersion=latest.version;d.dirty=true;d.merges=(d.merges||0)+1;
+      if(latest.updated_by&&latest.updated_by!==state.user?.id)d.mergedWith=latest.updated_by;
+      setNoteText(uid,r.text);setNoteStatus(uid,'Unione delle modifiche…');
+      setTimeout(()=>saveDraft(uid),0);return true;
+    }catch{return false;}
+  }
+  async function resolveConflict(uid,choice){
+    const d=state.drafts.get(uid);if(!d)return;
+    if(choice==='theirs'){clearTimeout(state.noteTimers.get(uid));state.drafts.delete(uid);if(!state.demo)await loadRemote();renderContent(true);notify('Tenuta la versione più recente.');return;}
+    const latest=await fetchLatestIdea(uid);if(!latest){notify('Questa idea è stata eliminata. Salva il tuo testo come nuova idea.',true);return;}
+    d.conflict=false;d.baseVersion=latest.version;d.baseContent=latest.content;d.dirty=true;d.merges=0;renderContent(true);await saveDraft(uid);notify('Il tuo testo è stato salvato.');
+  }
+  let lastTypingSent=0;
+  function sendTyping(uid){
+    if(state.demo||!state.channel||!state.connected||Date.now()-lastTypingSent<1500)return;lastTypingSent=Date.now();
+    try{const r=state.channel.send({type:'broadcast',event:'typing',payload:{idea:uid,user:state.user.id}});r?.catch?.(()=>{});}catch{}
+  }
+  const typingLabel=uid=>{const t=state.typing.get(uid);return t?`✎ ${memberName(t.user)} sta scrivendo…`:'';};
+  function paintTyping(uid){const el=$$('[data-typing-for]').find(x=>x.dataset.typingFor===uid);if(!el)return;el.textContent=typingLabel(uid);el.classList.toggle('active',state.typing.has(uid));}
+  function receiveTyping(p){
+    if(!p||!p.idea||p.user===state.user?.id||!member(p.user))return;
+    clearTimeout(state.typing.get(p.idea)?.timer);
+    const timer=setTimeout(()=>{state.typing.delete(p.idea);paintTyping(p.idea);},4000);
+    state.typing.set(p.idea,{user:p.user,timer});paintTyping(p.idea);
+  }
   function noteInput(el){
     const uid=el.dataset.noteId,note=state.ideas.find(n=>n.id===uid);if(!note)return;
-    let d=state.drafts.get(uid);if(!d){d={content:note.content,baseVersion:note.version,dirty:false,saving:false,conflict:false,snapshot:{...note}};state.drafts.set(uid,d);}
-    d.content=el.value;d.dirty=true;clearTimeout(state.noteTimers.get(uid));
+    let d=state.drafts.get(uid);if(!d){d={content:note.content,baseContent:note.content,baseVersion:note.version,dirty:false,saving:false,conflict:false,snapshot:{...note}};state.drafts.set(uid,d);}
+    d.content=el.value;d.dirty=true;clearTimeout(state.noteTimers.get(uid));sendTyping(uid);
     setNoteStatus(uid,d.conflict?'Da risolvere':'Scrittura…');
     if(!d.conflict)state.noteTimers.set(uid,setTimeout(()=>saveDraft(uid),650));
   }
@@ -318,10 +396,11 @@
     d.saving=true;d.failed=false;setNoteStatus(uid,'Salvataggio…');const sent=d.content,ver=d.baseVersion;
     try{
       const note=await update('ideas',uid,{content:sent,updated_by:state.user.id},ver);
-      if(state.drafts.get(uid)!==d)return;d.baseVersion=note.version;d.saving=false;d.dirty=d.content!==sent;
+      if(state.drafts.get(uid)!==d)return;d.baseVersion=note.version;d.baseContent=sent;d.saving=false;d.dirty=d.content!==sent;d.merges=0;
+      if(d.mergedWith){notify(`Le modifiche di ${memberName(d.mergedWith)} sono state unite alle tue.`);d.mergedWith=null;}
       setNoteStatus(uid,d.dirty?'Scrittura…':state.demo?'Temporanea':'Salvata');
       if(d.dirty)state.noteTimers.set(uid,setTimeout(()=>saveDraft(uid),200));else state.drafts.delete(uid);
-    }catch(err){d.saving=false;if(err.message==='CONFLICT'){d.conflict=true;renderContent(true);}else{d.failed=true;renderContent(true);setNoteStatus(uid,'Non salvata');notify('Idea non salvata. Il testo resta qui: usa Riprova sotto l’idea.',true);}}
+    }catch(err){d.saving=false;if(err.message==='CONFLICT'){if(await tryMerge(uid,d))return;d.conflict=true;renderContent(true);}else{d.failed=true;renderContent(true);setNoteStatus(uid,'Non salvata');notify('Idea non salvata. Il testo resta qui: usa Riprova sotto l’idea.',true);}}
   }
   function filterTransactions(period=state.period){const now=dateKey(today());return state.transactions.filter(t=>period==='all'||(period==='month'?t.date.slice(0,7)===now.slice(0,7):t.date.slice(0,4)===now.slice(0,4)));}
   const sumAmount=(arr,type)=>arr.filter(t=>!type||t.type===type).reduce((sum,t)=>sum+Math.round(Number(t.amount)*100),0)/100;
@@ -438,7 +517,7 @@
     },{saveLabel:r?'Salva modifiche':'Aggiungi link',extra:r?`<button type="button" class="btn danger" data-action="delete-resource" data-id="${r.id}">${icon('trash',13)}Elimina</button>`:''});
   }
   function renderSettings(){
-    return heading('Lo studio','Le persone, i dati e le piccole impostazioni che contano.')+`<div class="settings-grid"><section class="card settings-panel"><span class="tag blue">SHININGBULBS</span><h2 style="margin-top:17px">Due founder. Uno spazio.</h2><p>Accessi personali, progetti condivisi e idee che mantengono la firma di chi le ha scritte.</p><div class="member-list">${state.members.map(m=>`<div class="member-item">${avatar(m.id)}${esc(m.display_name)}<span class="tag">Founder</span></div>`).join('')}</div>${state.demo?`<div style="margin-top:25px"><p style="font-size:11px">Nell’anteprima puoi cambiare profilo per provare le firme:</p><div class="row">${state.members.map(m=>`<button class="btn small" data-action="demo-user" data-id="${m.id}">${avatar(m.id)}${esc(m.display_name)}</button>`).join('')}</div></div>`:''}</section><section class="card settings-panel"><h2>Il vostro database</h2><p>${state.demo?'Questa anteprima usa soltanto dati di esempio in memoria. I dati reali si salvano nel database condiviso dopo la configurazione.':'I dati dello studio sono salvati su Supabase. Se all’accesso hai scelto “Resta collegato”, la sessione resta su questo dispositivo finché non esci; altrimenti, ricaricando la pagina, dovrai accedere di nuovo.'}</p><span class="tag ${state.demo?'amber':state.connected?'green':'amber'}"><i class="dot"></i>${state.demo?'Anteprima · sincronizzazione da attivare':state.connected?'Database collegato':'Connessione in ripristino'}</span><div style="margin-top:22px"><button class="btn" data-action="setup">${icon('cloud',15)}Guida alla configurazione</button></div></section><section class="card settings-panel"><h2>I dati, anche fuori dallo studio.</h2><p>Scarica un’istantanea JSON di progetti, attività, idee, calendario e movimenti. Le password e le sessioni di accesso sono escluse.</p><button class="btn" data-action="export-all">${icon('download',15)}Esporta tutti i dati</button></section><section class="card settings-panel"><h2>Le cose semplici, più veloci.</h2><p>Usa <strong>⌘ K / Ctrl K</strong> per cercare nello studio e <strong>⌘ ⇧ N / Ctrl ⇧ N</strong> per creare un elemento nella sezione aperta. Puoi installare il sito come web app dal browser.</p><span class="tag">Connessione Internet necessaria</span></section></div>`;
+    return heading('Lo studio','Le persone, i dati e le piccole impostazioni che contano.')+`<div class="settings-grid"><section class="card settings-panel"><span class="tag blue">SHININGBULBS</span><h2 style="margin-top:17px">Due founder. Uno spazio.</h2><p>Accessi personali, progetti condivisi e idee che mantengono la firma di chi le ha scritte.</p><div class="member-list">${state.members.map(m=>`<div class="member-item">${avatar(m.id)}${esc(m.display_name)}<span class="tag">Founder</span></div>`).join('')}</div>${state.demo?`<div style="margin-top:25px"><p style="font-size:11px">Nell’anteprima puoi cambiare profilo per provare le firme:</p><div class="row">${state.members.map(m=>`<button class="btn small" data-action="demo-user" data-id="${m.id}">${avatar(m.id)}${esc(m.display_name)}</button>`).join('')}</div></div>`:''}</section><section class="card settings-panel"><h2>Il vostro database</h2><p>${state.demo?'Questa anteprima usa soltanto dati di esempio in memoria. I dati reali si salvano nel database condiviso dopo la configurazione.':'I dati dello studio sono salvati su Supabase. Se all’accesso hai scelto “Resta collegato”, la sessione resta su questo dispositivo finché non esci; altrimenti, ricaricando la pagina, dovrai accedere di nuovo.'}</p><span class="tag ${state.demo?'amber':state.connected?'green':'amber'}"><i class="dot"></i>${state.demo?'Anteprima · sincronizzazione da attivare':state.connected?'Database collegato':'Connessione in ripristino'}</span><div style="margin-top:22px"><button class="btn" data-action="setup">${icon('cloud',15)}Guida alla configurazione</button></div></section><section class="card settings-panel"><h2>I dati, anche fuori dallo studio.</h2><p>Scarica un’istantanea JSON di progetti, attività, idee, calendario e movimenti. Le password e le sessioni di accesso sono escluse.</p><button class="btn" data-action="export-all">${icon('download',15)}Esporta tutti i dati</button></section><section class="card settings-panel"><h2>Aspetto</h2><p>Automatico segue il tema chiaro o scuro del dispositivo. La scelta vale solo su questo dispositivo.</p>${themeSwitch()}</section><section class="card settings-panel"><h2>Le cose semplici, più veloci.</h2><p>Usa <strong>⌘ K / Ctrl K</strong> per cercare nello studio e <strong>⌘ ⇧ N / Ctrl ⇧ N</strong> per creare un elemento nella sezione aperta. Puoi installare il sito come web app dal browser.</p><span class="tag">Connessione Internet necessaria</span></section></div>`;
   }
   function closeModal(){const d=$('#modal');if(d.open)d.close();d.innerHTML='';}
   function openForm(title,body,onSave,options={}){
@@ -543,6 +622,7 @@
     if(!state.user)return;
     switch(a){
       case 'more-menu':moreSheet();break;
+      case 'set-theme':setTheme(el.dataset.themeValue);$$('[data-action=set-theme]').forEach(b=>b.classList.toggle('active',b.dataset.themeValue===themePref()));break;
       case 'nav':closeModal();state.view=el.dataset.view;state.projectId=null;if(state.view==='ideas')state.ideaFilter='all';renderContent();window.scrollTo(0,0);break;
       case 'logout':await logout();break;
       case 'new-project':projectForm();break;
@@ -587,6 +667,8 @@
       case 'copy-draft':{
         const d=state.drafts.get(uid),n=state.ideas.find(i=>i.id===uid)||d?.snapshot;if(!d||!n)break;await insert('ideas',{title:n.title+' · copia',content:d.content,project_id:project(n.project_id)?n.project_id:null,color:n.color,created_by:state.user.id,updated_by:state.user.id});state.drafts.delete(uid);notify('Il tuo testo è salvato in una nuova idea.');renderContent(true);break;
       }
+      case 'keep-mine':await resolveConflict(uid,'mine');break;
+      case 'keep-theirs':await resolveConflict(uid,'theirs');break;
       case 'retry-note':await saveDraft(uid);renderContent(true);break;
       case 'new-transaction':transactionForm();break;
       case 'edit-transaction':transactionForm(uid);break;
@@ -640,6 +722,7 @@
   window.addEventListener('beforeunload',e=>{if([...state.drafts.values()].some(d=>d.dirty||d.saving)){e.preventDefault();e.returnValue='';}});
   window.addEventListener('offline',()=>{if(state.user&&!state.demo){state.connected=false;updateSync();notify('Connessione assente. Le modifiche non salvate restano in questa finestra.',true);}});
   window.addEventListener('online',async()=>{if(state.user&&!state.demo){try{await loadRemote();for(const uid of state.drafts.keys())await saveDraft(uid);renderContent(true);}catch(e){notify(e.message,true);}}});
+  applyTheme();try{window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themePref()==='auto')applyTheme();});}catch{}
   if(new URLSearchParams(location.search).get('demo')==='1')startDemo();else renderLogin();
   if(new URLSearchParams(location.search).get('demo')!=='1'&&configured())restoreSession();
   if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./service-worker.js').catch(()=>{});

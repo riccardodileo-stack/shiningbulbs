@@ -113,3 +113,11 @@ dialog{width:min(540px,calc(100vw - 35px));max-height:88vh;border:1px solid #e9e
   .resources-panel{padding:16px}.detail-panel{padding:18px}
   .page-heading>.row{flex-wrap:wrap;justify-content:flex-end;min-width:0}
 }
+/* Tema */
+.theme-switch{display:inline-flex}.sheet-theme{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 6px;font-size:14px}
+/* Idee: scrittura insieme */
+.typing-indicator{display:none;font-size:10.5px;color:#5f82df;margin:-6px 0 8px;animation:typing-pulse 1.4s ease-in-out infinite}.typing-indicator.active{display:block}
+@keyframes typing-pulse{50%{opacity:.45}}
+.note-conflict strong{font-weight:600}.note-conflict details{margin-top:8px}.note-conflict summary{cursor:pointer;font-size:11px}
+.note-conflict pre{white-space:pre-wrap;font:inherit;font-size:11px;line-height:1.6;max-height:160px;overflow:auto;background:#f6f8fc;border-radius:8px;padding:8px 10px;margin-top:6px;color:#6f7889}
+.note-conflict-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}

@@ -13,8 +13,11 @@
   <link rel="icon" type="image/png" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./manifest.json">
+  <script>(function(){var t="auto";try{t=localStorage.getItem("shiningbulbs-theme")||"auto"}catch(e){}var d=t==="dark"||(t==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light");var m=document.querySelector('meta[name="theme-color"]');if(m&&d)m.content="#0e1014";})();</script>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./dark.css">
   <script defer src="./config.js"></script>
+  <script defer src="./vendor/diff_match_patch.js"></script>
   <script defer src="./script.js"></script>
 </head>
 <body>
