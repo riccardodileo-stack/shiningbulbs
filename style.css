@@ -121,3 +121,36 @@ dialog{width:min(540px,calc(100vw - 35px));max-height:88vh;border:1px solid #e9e
 .note-conflict strong{font-weight:600}.note-conflict details{margin-top:8px}.note-conflict summary{cursor:pointer;font-size:11px}
 .note-conflict pre{white-space:pre-wrap;font:inherit;font-size:11px;line-height:1.6;max-height:160px;overflow:auto;background:#f6f8fc;border-radius:8px;padding:8px 10px;margin-top:6px;color:#6f7889}
 .note-conflict-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+/* Task: finestra grande */
+dialog.modal-xl{width:min(1000px,calc(100vw - 40px));height:min(88vh,860px);max-height:none}
+dialog.modal-xl[open]{display:flex;flex-direction:column}
+dialog.modal-xl #dialog-form{display:flex;flex-direction:column;flex:1;min-height:0}
+dialog.modal-xl .modal-body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.todo-modal{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:30px;flex:1;min-height:0}
+.todo-modal-main{display:flex;flex-direction:column;gap:16px;min-height:0}
+.todo-modal-title{font-size:23px;font-weight:620;letter-spacing:-.5px;border:0;border-bottom:1px solid transparent;border-radius:0;padding:4px 0 8px;background:transparent;color:var(--ink)}
+.todo-modal-title:focus{box-shadow:none;border-bottom-color:var(--line)}
+.todo-modal-notes{flex:1 1 auto;min-height:220px;font-size:14px;line-height:1.75;padding:14px 16px;background:#f8f9fc;resize:vertical}
+.todo-modal-steps-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}.todo-modal-steps-head h3{font-size:13px}.todo-modal-steps-head .muted{font-size:10.5px}
+.todo-modal-stepsarea{min-height:150px;font-size:14px;line-height:1.8;width:100%}
+.todo-modal-hint{display:block;font-size:10.5px;margin-top:6px}
+.todo-modal .task-list{padding:0}
+.todo-modal-add{display:flex;align-items:center;gap:8px;padding-top:12px;border-top:1px dashed #eceef3;margin-top:4px}.todo-modal-add .add-icon{color:#a7b6df;display:flex}.todo-modal-add input{flex:1;border:0;background:#f7f8fb;padding:9px 11px;font-size:13px}
+.todo-modal-empty{font-size:12px;color:var(--muted);padding:6px 0 4px}
+.todo-modal-side{border-left:1px solid var(--line);padding-left:26px}
+.todo-modal-side #todo-modal-status{margin-top:6px}.todo-modal-side .progress-label{font-size:11px}
+.todo-modal-meta{font-size:10.5px;color:#a4acba;margin-top:14px}
+.todo-open{cursor:pointer}.todo-main h3.todo-open:hover,.my-main .todo-open:hover{color:var(--blue)}
+.todo-notes{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media(max-width:720px){
+  dialog.modal-xl{width:100%;height:96dvh}
+  .todo-modal{grid-template-columns:1fr;gap:18px;flex:none;min-height:auto}
+  .todo-modal-main{min-height:auto}.todo-modal-notes{flex:none}
+  .todo-modal-side{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:16px}
+  .todo-modal-title{font-size:20px}
+  .todo-modal-notes{min-height:180px;font-size:16px}
+  .todo-modal-stepsarea{font-size:16px}
+  .todo-modal .task-row{flex-wrap:wrap;gap:4px 8px;padding:10px 0}
+  .todo-modal .task-row>.task-owner{margin-left:30px}.todo-modal .task-row>.icon-btn{margin-left:auto}
+  .todo-modal-add select{display:none}.todo-modal-add input{font-size:16px}
+}

@@ -289,5 +289,16 @@ html[data-theme=dark] .tab-badge{background:#354162;color:#ffffff}
 html[data-theme=dark] dialog[open]{border-bottom:0}}
 html[data-theme=dark] .typing-indicator{color:#90a9e9}
 html[data-theme=dark] .note-conflict pre{background:#16191f;color:#a1a6af}
+html[data-theme=dark] .todo-modal-title{border:0;border-bottom:1px solid transparent;background:transparent;color:var(--ink)}
+html[data-theme=dark] .todo-modal-title:focus{box-shadow:none;border-bottom-color:var(--line)}
+html[data-theme=dark] .todo-modal-notes{background:#161920}
+html[data-theme=dark] .todo-modal-add{border-top:1px dashed #232937}
+html[data-theme=dark] .todo-modal-add .add-icon{color:#4e68ac}
+html[data-theme=dark] .todo-modal-add input{border:0;background:#16181f}
+html[data-theme=dark] .todo-modal-empty{color:var(--muted)}
+html[data-theme=dark] .todo-modal-side{border-left:1px solid var(--line)}
+html[data-theme=dark] .todo-modal-meta{color:#7c8696}
+html[data-theme=dark] .todo-main h3.todo-open:hover,html[data-theme=dark] .my-main .todo-open:hover{color:var(--blue)}
+@media(max-width:720px){html[data-theme=dark] .todo-modal-side{border-left:0;border-top:1px solid var(--line)}}
 
 /* ===== MANUALE: rifiniture a mano (non generate) ===== */
