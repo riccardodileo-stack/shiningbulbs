@@ -300,5 +300,8 @@ html[data-theme=dark] .todo-modal-side{border-left:1px solid var(--line)}
 html[data-theme=dark] .todo-modal-meta{color:#7c8696}
 html[data-theme=dark] .todo-main h3.todo-open:hover,html[data-theme=dark] .my-main .todo-open:hover{color:var(--blue)}
 @media(max-width:720px){html[data-theme=dark] .todo-modal-side{border-left:0;border-top:1px solid var(--line)}}
+html[data-theme=dark] .idea-modal-text{background:#171722}
+html[data-theme=dark] .idea-modal-save{color:#8891a1}
+html[data-theme=dark] .note h3.todo-open:hover{color:var(--blue)}
 
 /* ===== MANUALE: rifiniture a mano (non generate) ===== */

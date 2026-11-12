@@ -51,6 +51,7 @@
     book:'<path d="M12 5v16m0-16C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 1Z"/>',
     sparkles:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5ZM20 2v4m-2-2h4"/>',
     cloud:'<path d="M6 18a5 5 0 0 1-1-10 7 7 0 0 1 13 0 5 5 0 0 1 0 10m-6 3V11m-3 3 3-3 3 3"/>',
+    expand:'<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>',
     todos:'<path d="M11 6h9M11 12h9M11 18h9"/><path d="m3 6 1.5 1.5L7 5m-4 7 1.5 1.5L7 11"/><circle cx="5" cy="18" r="1.3"/>',
     mytodos:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-1a6 6 0 0 1 10-4.5m3 2.5 2.5 2.5L22 16"/>',
   };
@@ -253,7 +254,7 @@
     main.innerHTML=views[state.view]()+`<footer class="page-footer"><span>ShiningBulbs Studio &nbsp;·&nbsp; Built together.</span><span>Un’idea alla volta. Una release alla volta.</span></footer>`;
     if(preserve&&key){const el=$$('[data-focus-key]',main).find(e=>e.dataset.focusKey===key);if(el){if(typed!==undefined&&el.tagName==='INPUT'&&el.type==='text')el.value=typed;el.focus({preventScroll:true});if(typeof start==='number'&&typeof el.setSelectionRange==='function'){let s0=start,e0=end;if(noteOld!==undefined&&el.value!==noteOld){s0=mapCursor(noteOld,el.value,start);e0=mapCursor(noteOld,el.value,end);}try{el.setSelectionRange(s0,e0);}catch{}}}}
     if(preserve){window.scrollTo(0,scrollY);if(scrollTop!==undefined&&$('.calendar-scroll'))$('.calendar-scroll').scrollTop=scrollTop;}
-    refreshTodoModal();
+    refreshTodoModal();refreshIdeaModal();
     if(state.view==='calendar'&&state.calView==='week'&&!preserve&&$('.calendar-scroll'))$('.calendar-scroll').scrollTop=7*60;
   }
   function heading(title,subtitle,action='',eyebrow=''){return `<div class="page-heading"><div>${eyebrow?`<div class="eyebrow">${esc(eyebrow)}</div>`:''}<h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>${action}</div>`;}
@@ -317,9 +318,9 @@
   function renderIdeas(){
     const orphaned=[...state.drafts.entries()].filter(([uid,d])=>!state.ideas.some(n=>n.id===uid)&&d.snapshot).map(([,d])=>{d.conflict=true;return d.snapshot;});
     const list=[...state.ideas,...orphaned].filter(n=>state.ideaFilter==='all'||state.ideaFilter===n.created_by||state.ideaFilter===n.project_id).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
-    return heading('Idee','Lo spazio bianco prima della prossima grande cosa.',newButton('idea','Nuova idea'))+`<div class="ideas-toolbar"><button class="filter-chip ${state.ideaFilter==='all'?'active':''}" data-action="idea-filter" data-filter="all">Tutte le idee</button>${state.members.map(m=>`<button class="filter-chip ${state.ideaFilter===m.id?'active':''}" data-action="idea-filter" data-filter="${m.id}">${esc(m.display_name)}</button>`).join('')}${state.projects.map(p=>`<button class="filter-chip ${state.ideaFilter===p.id?'active':''}" data-action="idea-filter" data-filter="${p.id}">${esc(p.name)}</button>`).join('')}</div><div class="ideas-grid">${list.map(n=>{const draft=state.drafts.get(n.id),content=draft?draft.content:n.content;return `<article class="card note ${n.color||'blue'}"><div class="row between"><span class="tag ${n.color||'blue'}">${n.project_id?esc(project(n.project_id)?.name||'Studio'):'Pensieri sparsi'}</span><button class="icon-btn" data-action="edit-idea" data-id="${n.id}" title="Modifica titolo e dettagli" aria-label="Modifica ${esc(n.title)}">${icon('more',16)}</button></div><h3>${esc(n.title)}</h3><span class="typing-indicator ${state.typing.has(n.id)?'active':''}" data-typing-for="${n.id}" aria-live="polite">${esc(typingLabel(n.id))}</span><textarea data-note-id="${n.id}" data-focus-key="note-${n.id}" aria-label="Testo: ${esc(n.title)}" placeholder="Inizia da un’intuizione…" maxlength="20000">${esc(content)}</textarea>${draft?.conflict?`<div class="note-conflict"><strong>${draft.theirsBy&&draft.theirsBy!==state.user.id?esc(memberName(draft.theirsBy))+' ha modificato le stesse parole mentre scrivevi.':'L’idea è cambiata durante la scrittura.'}</strong> Nessun testo è andato perso: qui sopra c’è il tuo.${typeof draft.theirs==='string'?`<details><summary>Vedi l’altra versione</summary><pre>${esc(draft.theirs)}</pre></details>`:''}<div class="note-conflict-actions"><button class="btn small primary" data-action="keep-mine" data-id="${n.id}">Tieni il mio</button>${typeof draft.theirs==='string'?`<button class="btn small" data-action="keep-theirs" data-id="${n.id}">Tieni l’altra</button>`:''}<button class="btn small" data-action="copy-draft" data-id="${n.id}">Salva il mio come nuova idea</button></div></div>`:draft?.failed?`<div class="note-conflict">Connessione non disponibile. Il testo è ancora qui.<br><button class="btn small" data-action="retry-note" data-id="${n.id}" style="margin-top:6px">Riprova il salvataggio</button></div>`:''}<div class="note-foot">${avatar(n.created_by)}<span>Idea di ${esc(memberName(n.created_by))}</span>${n.updated_by&&n.updated_by!==n.created_by?`<span title="Ultima modifica di ${esc(memberName(n.updated_by))}">· modificata da ${esc(memberName(n.updated_by))}</span>`:''}<span class="save-status" data-save-status="${n.id}">${draft?.conflict?'Da risolvere':draft?.saving?'Salvataggio…':draft?.dirty?'Da salvare':state.demo?'Temporanea':'Salvata'}</span></div></article>`;}).join('')}<button class="project-add note-add" data-action="new-idea"><span class="add-circle">${icon('plus',17)}</span>C’è spazio per un’altra idea</button></div><div class="ideas-caption">${icon('info',13)}Ogni idea ha una firma. Il testo si salva mentre scrivete; se scrivete insieme nella stessa idea, le modifiche vengono unite da sole.</div>`;
+    return heading('Idee','Lo spazio bianco prima della prossima grande cosa.',newButton('idea','Nuova idea'))+`<div class="ideas-toolbar"><button class="filter-chip ${state.ideaFilter==='all'?'active':''}" data-action="idea-filter" data-filter="all">Tutte le idee</button>${state.members.map(m=>`<button class="filter-chip ${state.ideaFilter===m.id?'active':''}" data-action="idea-filter" data-filter="${m.id}">${esc(m.display_name)}</button>`).join('')}${state.projects.map(p=>`<button class="filter-chip ${state.ideaFilter===p.id?'active':''}" data-action="idea-filter" data-filter="${p.id}">${esc(p.name)}</button>`).join('')}</div><div class="ideas-grid">${list.map(n=>{const draft=state.drafts.get(n.id),content=draft?draft.content:n.content;return `<article class="card note ${n.color||'blue'}"><div class="row between"><span class="tag ${n.color||'blue'}">${n.project_id?esc(project(n.project_id)?.name||'Studio'):'Pensieri sparsi'}</span><button class="icon-btn" data-action="edit-idea" data-id="${n.id}" title="Apri in grande" aria-label="Apri ${esc(n.title)} in grande">${icon('expand',15)}</button></div><h3 class="todo-open" data-action="edit-idea" data-id="${n.id}" role="button" tabindex="0" title="Apri in grande">${esc(n.title)}</h3><span class="typing-indicator ${state.typing.has(n.id)?'active':''}" data-typing-for="${n.id}" aria-live="polite">${esc(typingLabel(n.id))}</span><textarea data-note-id="${n.id}" data-focus-key="note-${n.id}" aria-label="Testo: ${esc(n.title)}" placeholder="Inizia da un’intuizione…" maxlength="20000">${esc(content)}</textarea>${ideaConflict(n,draft)}<div class="note-foot">${avatar(n.created_by)}<span>Idea di ${esc(memberName(n.created_by))}</span>${n.updated_by&&n.updated_by!==n.created_by?`<span title="Ultima modifica di ${esc(memberName(n.updated_by))}">· modificata da ${esc(memberName(n.updated_by))}</span>`:''}<span class="save-status" data-save-status="${n.id}">${draft?.conflict?'Da risolvere':draft?.saving?'Salvataggio…':draft?.dirty?'Da salvare':state.demo?'Temporanea':'Salvata'}</span></div></article>`;}).join('')}<button class="project-add note-add" data-action="new-idea"><span class="add-circle">${icon('plus',17)}</span>C’è spazio per un’altra idea</button></div><div class="ideas-caption">${icon('info',13)}Ogni idea ha una firma. Il testo si salva mentre scrivete; se scrivete insieme nella stessa idea, le modifiche vengono unite da sole.</div>`;
   }
-  function setNoteStatus(uid,text){const el=$$('[data-save-status]').find(x=>x.dataset.saveStatus===uid);if(el)el.textContent=text;}
+  function setNoteStatus(uid,text){$$('[data-save-status]').filter(x=>x.dataset.saveStatus===uid).forEach(el=>el.textContent=text);}
   // ===== Idee: unione automatica delle modifiche (3 vie) e indicatore "sta scrivendo"
   let dmpInstance=null;
   const dmp=()=>{if(!dmpInstance&&window.diff_match_patch){dmpInstance=new window.diff_match_patch();dmpInstance.Diff_Timeout=0.5;}return dmpInstance;};
@@ -344,9 +345,9 @@
   }
   const mapCursor=(oldText,newText,pos)=>{const d=dmp();if(!d||typeof pos!=='number')return Math.min(pos||0,newText.length);return d.diff_xIndex(d.diff_main(oldText,newText),pos);};
   function setNoteText(uid,text){
-    const el=$$('[data-note-id]').find(x=>x.dataset.noteId===uid);if(!el||el.value===text)return;
+    for(const el of $$('[data-note-id]').filter(x=>x.dataset.noteId===uid)){if(el.value===text)continue;
     const focused=document.activeElement===el,old=el.value,s=el.selectionStart,e=el.selectionEnd;el.value=text;
-    if(focused){try{el.setSelectionRange(mapCursor(old,text,s),mapCursor(old,text,e));}catch{}}
+    if(focused){try{el.setSelectionRange(mapCursor(old,text,s),mapCursor(old,text,e));}catch{}}}
   }
   async function fetchLatestIdea(uid){
     if(state.demo)return state.ideas.find(i=>i.id===uid)||null;
@@ -378,7 +379,7 @@
     try{const r=state.channel.send({type:'broadcast',event:'typing',payload:{idea:uid,user:state.user.id}});r?.catch?.(()=>{});}catch{}
   }
   const typingLabel=uid=>{const t=state.typing.get(uid);return t?`✎ ${memberName(t.user)} sta scrivendo…`:'';};
-  function paintTyping(uid){const el=$$('[data-typing-for]').find(x=>x.dataset.typingFor===uid);if(!el)return;el.textContent=typingLabel(uid);el.classList.toggle('active',state.typing.has(uid));}
+  function paintTyping(uid){$$('[data-typing-for]').filter(x=>x.dataset.typingFor===uid).forEach(el=>{el.textContent=typingLabel(uid);el.classList.toggle('active',state.typing.has(uid));});}
   function receiveTyping(p){
     if(!p||!p.idea||p.user===state.user?.id||!member(p.user))return;
     clearTimeout(state.typing.get(p.idea)?.timer);
@@ -389,6 +390,7 @@
     const uid=el.dataset.noteId,note=state.ideas.find(n=>n.id===uid);if(!note)return;
     let d=state.drafts.get(uid);if(!d){d={content:note.content,baseContent:note.content,baseVersion:note.version,dirty:false,saving:false,conflict:false,snapshot:{...note}};state.drafts.set(uid,d);}
     d.content=el.value;d.dirty=true;clearTimeout(state.noteTimers.get(uid));sendTyping(uid);
+    $$('[data-note-id]').forEach(x=>{if(x!==el&&x.dataset.noteId===uid&&x.value!==el.value)x.value=el.value;});
     setNoteStatus(uid,d.conflict?'Da risolvere':'Scrittura…');
     if(!d.conflict)state.noteTimers.set(uid,setTimeout(()=>saveDraft(uid),650));
   }
@@ -543,9 +545,9 @@
   function renderSettings(){
     return heading('Lo studio','Le persone, i dati e le piccole impostazioni che contano.')+`<div class="settings-grid"><section class="card settings-panel"><span class="tag blue">SHININGBULBS</span><h2 style="margin-top:17px">Due founder. Uno spazio.</h2><p>Accessi personali, progetti condivisi e idee che mantengono la firma di chi le ha scritte.</p><div class="member-list">${state.members.map(m=>`<div class="member-item">${avatar(m.id)}${esc(m.display_name)}<span class="tag">Founder</span></div>`).join('')}</div>${state.demo?`<div style="margin-top:25px"><p style="font-size:11px">Nell’anteprima puoi cambiare profilo per provare le firme:</p><div class="row">${state.members.map(m=>`<button class="btn small" data-action="demo-user" data-id="${m.id}">${avatar(m.id)}${esc(m.display_name)}</button>`).join('')}</div></div>`:''}</section><section class="card settings-panel"><h2>Il vostro database</h2><p>${state.demo?'Questa anteprima usa soltanto dati di esempio in memoria. I dati reali si salvano nel database condiviso dopo la configurazione.':'I dati dello studio sono salvati su Supabase. Se all’accesso hai scelto “Resta collegato”, la sessione resta su questo dispositivo finché non esci; altrimenti, ricaricando la pagina, dovrai accedere di nuovo.'}</p><span class="tag ${state.demo?'amber':state.connected?'green':'amber'}"><i class="dot"></i>${state.demo?'Anteprima · sincronizzazione da attivare':state.connected?'Database collegato':'Connessione in ripristino'}</span><div style="margin-top:22px"><button class="btn" data-action="setup">${icon('cloud',15)}Guida alla configurazione</button></div></section><section class="card settings-panel"><h2>I dati, anche fuori dallo studio.</h2><p>Scarica un’istantanea JSON di progetti, attività, idee, calendario e movimenti. Le password e le sessioni di accesso sono escluse.</p><button class="btn" data-action="export-all">${icon('download',15)}Esporta tutti i dati</button></section><section class="card settings-panel"><h2>Aspetto</h2><p>Automatico segue il tema chiaro o scuro del dispositivo. La scelta vale solo su questo dispositivo.</p>${themeSwitch()}</section><section class="card settings-panel"><h2>Le cose semplici, più veloci.</h2><p>Usa <strong>⌘ K / Ctrl K</strong> per cercare nello studio e <strong>⌘ ⇧ N / Ctrl ⇧ N</strong> per creare un elemento nella sezione aperta. Puoi installare il sito come web app dal browser.</p><span class="tag">Connessione Internet necessaria</span></section></div>`;
   }
-  function closeModal(){const d=$('#modal');if(d.open)d.close();d.innerHTML='';delete d.dataset.todoId;}
+  function closeModal(){const d=$('#modal');if(d.open)d.close();d.innerHTML='';delete d.dataset.todoId;delete d.dataset.ideaId;}
   function openForm(title,body,onSave,options={}){
-    const d=$('#modal');if(d.open)d.close();d.className=options.className||'';
+    const d=$('#modal');if(d.open)d.close();d.className=options.className||'';delete d.dataset.todoId;delete d.dataset.ideaId;
     d.innerHTML=`<form id="dialog-form"><div class="modal-header"><h2 id="modal-title">${esc(title)}</h2><button class="icon-btn" data-action="close-modal" type="button" aria-label="Chiudi finestra">${icon('close',17)}</button></div><div class="modal-body">${body}<p class="form-error" role="alert"></p></div><div class="modal-footer">${options.extra||''}<button class="btn" type="button" data-action="close-modal">Annulla</button><button class="btn ${options.danger?'danger':'primary'}" type="submit">${esc(options.saveLabel||'Salva')}</button></div></form>`;
     $('#dialog-form',d).addEventListener('submit',async e=>{
       e.preventDefault();const form=e.currentTarget;if(!form.reportValidity())return;const btn=$('[type=submit]',form);btn.disabled=true;const txt=btn.textContent;btn.textContent='Salvataggio…';$('.form-error',form).textContent='';
@@ -581,13 +583,47 @@
       if(ev)await update('events',uid,values,ev.version);else await insert('events',{...values,created_by:state.user.id});notify(ev?'Incontro aggiornato.':'Incontro aggiunto al calendario.');
     },{saveLabel:ev?'Salva modifiche':'Aggiungi incontro',extra:ev?`<button class="btn danger" type="button" data-action="delete-event" data-id="${ev.id}" aria-label="Elimina incontro">${icon('trash',13)}</button><button class="btn" type="button" data-action="download-event" data-id="${ev.id}" aria-label="Esporta incontro">${icon('download',13)}</button>`:''});
   }
+  const ideaConflict=(n,draft)=>draft?.conflict?`<div class="note-conflict"><strong>${draft.theirsBy&&draft.theirsBy!==state.user.id?esc(memberName(draft.theirsBy))+' ha modificato le stesse parole mentre scrivevi.':'L’idea è cambiata durante la scrittura.'}</strong> Nessun testo è andato perso: qui sopra c’è il tuo.${typeof draft.theirs==='string'?`<details><summary>Vedi l’altra versione</summary><pre>${esc(draft.theirs)}</pre></details>`:''}<div class="note-conflict-actions"><button class="btn small primary" data-action="keep-mine" data-id="${n.id}">Tieni il mio</button>${typeof draft.theirs==='string'?`<button class="btn small" data-action="keep-theirs" data-id="${n.id}">Tieni l’altra</button>`:''}<button class="btn small" data-action="copy-draft" data-id="${n.id}">Salva il mio come nuova idea</button></div></div>`:draft?.failed?`<div class="note-conflict">Connessione non disponibile. Il testo è ancora qui.<br><button class="btn small" data-action="retry-note" data-id="${n.id}" style="margin-top:6px">Riprova il salvataggio</button></div>`:'';
+  const colorOptions=v=>Object.keys(COLORS).map((c,i)=>`<option value="${c}" ${(v||'blue')===c?'selected':''}>${['Blu cielo','Lavanda','Salvia','Sabbia'][i]}</option>`).join('');
   function ideaForm(uid){
-    const n=state.ideas.find(i=>i.id===uid);
-    openForm(n?'I dettagli dell’idea':'Ogni grande app inizia così.',`<div class="form-grid"><div class="full">${inputField('Un titolo per ritrovarla','title',n?.title||'','text','required maxlength="120" placeholder="E se provassimo a…?"')}</div>${!n?'<label class="field full"><span>L’idea</span><textarea name="content" maxlength="20000" style="min-height:160px" placeholder="Scrivi liberamente. Qui c’è spazio per tutto."></textarea></label>':''}<label class="field"><span>Collegata a</span><select name="project_id">${projectOptions(n?.project_id||(state.ideaFilter!=='all'&&project(state.ideaFilter)?state.ideaFilter:null))}</select></label><label class="field"><span>Colore</span><select name="color">${Object.keys(COLORS).map((c,i)=>`<option value="${c}" ${(n?.color||'blue')===c?'selected':''}>${['Blu cielo','Lavanda','Salvia','Sabbia'][i]}</option>`).join('')}</select></label></div><p class="modal-description" style="margin-bottom:0">${n?'Il testo si modifica direttamente nel foglio dell’idea.':'L’idea porterà la firma di '+esc(memberName(state.user.id))+'. Potrete modificarla entrambi.'}</p>`,async fd=>{
+    if(uid)return ideaModal(uid);
+    const defProject=state.ideaFilter!=='all'&&project(state.ideaFilter)?state.ideaFilter:null;
+    openForm('Ogni grande app inizia così.',`<div class="todo-modal"><div class="todo-modal-main"><input class="todo-modal-title" name="title" required maxlength="120" placeholder="Un titolo per ritrovarla" aria-label="Titolo dell’idea" autocomplete="off"><textarea class="todo-modal-notes idea-modal-text" name="content" maxlength="20000" placeholder="Scrivi liberamente. Qui c’è spazio per tutto." aria-label="L’idea"></textarea></div><aside class="todo-modal-side"><label class="field"><span>Collegata a</span><select name="project_id">${projectOptions(defProject)}</select></label><label class="field"><span>Colore</span><select name="color">${colorOptions('blue')}</select></label><p class="todo-modal-meta">L’idea porterà la firma di ${esc(memberName(state.user.id))}. Potrete modificarla entrambi.</p></aside></div>`,async fd=>{
       const values={title:fd.get('title').trim(),project_id:fd.get('project_id')||null,color:fd.get('color'),updated_by:state.user.id};if(!values.title)throw new Error('Dai un titolo all’idea.');
-      if(n){const saved=await update('ideas',uid,values);const draft=state.drafts.get(uid);if(draft&&!draft.saving&&!draft.conflict&&draft.baseVersion===n.version)draft.baseVersion=saved.version;}
-      else{await insert('ideas',{...values,content:fd.get('content'),created_by:state.user.id});state.ideaFilter='all';}notify(n?'Dettagli dell’idea aggiornati.':'Una nuova idea nello studio.');
-    },{saveLabel:n?'Salva dettagli':'Aggiungi idea',extra:n?`<button type="button" class="btn danger" data-action="delete-idea" data-id="${n.id}">${icon('trash',13)}Elimina</button>`:''});
+      await insert('ideas',{...values,content:fd.get('content'),created_by:state.user.id});state.ideaFilter='all';notify('Una nuova idea nello studio.');
+    },{className:'modal-xl',saveLabel:'Aggiungi idea'});
+    setTimeout(()=>$('#modal .todo-modal-title')?.focus(),30);
+  }
+  const ideaMeta=n=>`Idea di ${esc(memberName(n.created_by))}${n.updated_by&&n.updated_by!==n.created_by?` · modificata da ${esc(memberName(n.updated_by))}`:''}`;
+  const ideaStatus=(n,draft)=>draft?.conflict?'Da risolvere':draft?.saving?'Salvataggio…':draft?.dirty?'Da salvare':state.demo?'Temporanea':'Salvata';
+  // Finestra grande per leggere e scrivere un'idea: tutto si salva da solo, come nella card.
+  function ideaModal(uid){
+    const n=state.ideas.find(i=>i.id===uid);if(!n)return;
+    const draft=state.drafts.get(uid),d=$('#modal');if(d.open)d.close();d.className='modal-xl';delete d.dataset.todoId;
+    d.innerHTML=`<div class="modal-header"><span class="tag ${n.color||'blue'}" id="idea-modal-tag">${n.project_id?esc(project(n.project_id)?.name||'Studio'):'Pensieri sparsi'}</span><button type="button" class="icon-btn" data-action="close-modal" aria-label="Chiudi finestra">${icon('close',17)}</button></div><div class="modal-body"><div class="todo-modal"><div class="todo-modal-main"><input class="todo-modal-title" value="${esc(n.title)}" maxlength="120" data-idea-field="title" data-id="${n.id}" aria-label="Titolo dell’idea" autocomplete="off"><span class="typing-indicator ${state.typing.has(n.id)?'active':''}" data-typing-for="${n.id}" aria-live="polite">${esc(typingLabel(n.id))}</span><textarea class="todo-modal-notes idea-modal-text" data-note-id="${n.id}" data-focus-key="m-note-${n.id}" maxlength="20000" placeholder="Scrivi liberamente. Qui c’è spazio per tutto." aria-label="Testo: ${esc(n.title)}">${esc(draft?draft.content:n.content)}</textarea><div id="idea-modal-conflict">${ideaConflict(n,draft)}</div></div><aside class="todo-modal-side"><label class="field"><span>Collegata a</span><select data-idea-field="project_id" data-id="${n.id}">${projectOptions(n.project_id)}</select></label><label class="field"><span>Colore</span><select data-idea-field="color" data-id="${n.id}">${colorOptions(n.color)}</select></label><p class="todo-modal-meta" id="idea-modal-meta">${ideaMeta(n)}</p><p class="idea-modal-save">${icon('cloud',13)}<span class="save-status" data-save-status="${n.id}">${ideaStatus(n,draft)}</span></p><p class="todo-modal-meta">Il testo si salva da solo mentre scrivi. Se scrivete insieme, le modifiche vengono unite.</p></aside></div></div><div class="modal-footer"><button type="button" class="btn danger" data-action="delete-idea" data-id="${n.id}">${icon('trash',13)}Elimina</button><button type="button" class="btn primary" data-action="close-modal">Fatto ${icon('check',14)}</button></div>`;
+    d.dataset.ideaId=n.id;d.showModal();
+    const ta=$('textarea[data-note-id]',d);setTimeout(()=>{ta.focus();try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch{}},30);
+  }
+  // Tiene allineata la finestra aperta con le modifiche arrivate (dell'altro founder o salvate altrove).
+  function refreshIdeaModal(){
+    const d=$('#modal'),uid=d?.dataset?.ideaId;if(!d?.open||!uid)return;
+    const n=state.ideas.find(i=>i.id===uid);if(!n)return;
+    const draft=state.drafts.get(uid),ta=$('textarea[data-note-id]',d);
+    if(ta&&!draft&&ta.value!==n.content){const focused=document.activeElement===ta,old=ta.value,s=ta.selectionStart,e=ta.selectionEnd;ta.value=n.content;if(focused){try{ta.setSelectionRange(mapCursor(old,n.content,s),mapCursor(old,n.content,e));}catch{}}}
+    const c=$('#idea-modal-conflict',d);if(c)c.innerHTML=ideaConflict(n,draft);
+    for(const el of $$('[data-idea-field]',d)){const f=el.dataset.ideaField,v=n[f]||'';if(document.activeElement!==el&&el.value!==v)el.value=v;}
+    const tag=$('#idea-modal-tag',d);if(tag){tag.className=`tag ${n.color||'blue'}`;tag.textContent=n.project_id?project(n.project_id)?.name||'Studio':'Pensieri sparsi';}
+    const meta=$('#idea-modal-meta',d);if(meta)meta.innerHTML=ideaMeta(n);
+    const st=$('[data-save-status]',d);if(st)st.textContent=ideaStatus(n,draft);
+  }
+  async function saveIdeaField(el){
+    const n=state.ideas.find(i=>i.id===el.dataset.id);if(!n)return;const f=el.dataset.ideaField;let v=el.value;
+    if(f==='title'){v=v.trim();if(!v){el.value=n.title;return;}}
+    if(f==='project_id')v=v||null;
+    if((n[f]||null)===(v||null))return;
+    const saved=await update('ideas',n.id,{[f]:v,updated_by:state.user.id});
+    const draft=state.drafts.get(n.id);if(draft&&!draft.saving&&!draft.conflict&&draft.baseVersion===n.version)draft.baseVersion=saved.version;
+    renderContent(true);
   }
   function transactionForm(uid){
     const t=state.transactions.find(i=>i.id===uid);
@@ -700,7 +736,7 @@
       case 'delete-project':case 'delete-event':case 'delete-idea':case 'delete-transaction':case 'delete-todo':case 'delete-resource':await deleteItem(a.slice(7),uid);break;
       case 'search':searchDialog();break;
       case 'search-result':{
-        const type=el.dataset.type;closeModal();if(type==='project'){state.view='projects';state.projectId=uid;renderContent();}else if(type==='event'){eventForm(uid);}else if(type==='todo'){gotoTodo(uid);}else{state.view='ideas';state.ideaFilter='all';renderContent();const input=$$('[data-note-id]').find(e=>e.dataset.noteId===uid);if(input){input.scrollIntoView({behavior:'smooth',block:'center'});input.focus({preventScroll:true});}}break;
+        const type=el.dataset.type;closeModal();if(type==='project'){state.view='projects';state.projectId=uid;renderContent();}else if(type==='event'){eventForm(uid);}else if(type==='todo'){gotoTodo(uid);}else{state.view='ideas';state.ideaFilter='all';renderContent();ideaModal(uid);}break;
       }
       case 'export-finance':exportFinance();break;
       case 'export-calendar':exportCalendar();break;
@@ -720,6 +756,7 @@
   document.addEventListener('change',async e=>{
     const el=e.target;try{
       if(el.id==='finance-period'){state.period=el.value;renderContent(true);}
+      if(el.dataset.ideaField){el.disabled=true;await saveIdeaField(el);el.disabled=false;return;}
       if(['todo-owner','todo-date','todo-title'].includes(el.dataset.action)){
         const t=state.todos.find(x=>x.id===el.dataset.id);if(!t)return;const a=el.dataset.action;let values;
         if(a==='todo-owner')values={owner_id:el.value||null};else if(a==='todo-date')values={due_date:el.value||null};else{const v=el.value.trim();if(!v){el.value=t.title;return;}if(v===t.title)return;values={title:v};}
@@ -741,7 +778,8 @@
   document.addEventListener('keydown',e=>{
     if(e.key==='Enter'&&e.target.matches?.('.task-title-input')){e.preventDefault();e.target.blur();}
     if(e.key==='Enter'&&e.target.matches?.('[data-modal-add]')){e.preventDefault();addStepFromModal(e.target.dataset.modalAdd).catch(err=>notify(err.message,true));}
-    if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('.todo-open[role=button]')){e.preventDefault();todoForm(e.target.dataset.id);}
+    if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('.todo-open[role=button]')){e.preventDefault();handleAction(e.target,e).catch(err=>notify(err.message,true));}
+    if(e.key==='Enter'&&e.target.matches?.('[data-idea-field=title]')){e.preventDefault();e.target.blur();}
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'&&state.user){e.preventDefault();searchDialog();}
     if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='n'&&state.user&&!$('#modal').open){e.preventDefault();({projects:projectForm,todos:todoForm,mytodos:todoForm,calendar:eventForm,ideas:ideaForm,revenues:transactionForm,settings:()=>{}}[state.view])();}
     if((e.key==='Enter'||e.key===' ')&&e.target.matches('.day-column,.month-day')){e.preventDefault();eventForm(null,{date:e.target.dataset.date});}
